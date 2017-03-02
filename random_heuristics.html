@@ -1,0 +1,337 @@
+<html>
+<head>
+	<title>Test</title>
+	<link rel="stylesheet" type="text/css" href="css/chessboard-0.3.0.css" media="screen" />
+	<link rel="stylesheet" type="text/css" href="css/chessboard-0.3.0.min.css" media="screen" />
+</head>
+<body bgcolor="brown">
+<script src="js/chessboard-0.3.0.js" type="text/javascript"></script>
+<script src="js/chessboard-0.3.0.min" type="text/javascript"></script>
+ <script src="https://code.jquery.com/jquery-1.10.1.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.js"></script>
+<center><div id="board" style="width: 400px"></div></center>
+<script>
+
+var board,turn=0,
+  game = new Chess(),
+  statusEl = $('#status'),
+  fenEl = $('#fen'),
+  pgnEl = $('#pgn');
+
+// do not pick up pieces if the game is over
+// only pick up pieces for the side to move
+var onDragStart = function(source, piece, position, orientation) {
+  if (game.game_over() === true || 
+       turn == 1||
+      (game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+      (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+    return false;
+  }
+};
+
+var onDrop = function(source, target) {
+  // see if the move is legal
+  var move = game.move({
+    from: source,
+    to: target,
+    promotion: 'q' // NOTE: always promote to a queen for example simplicity
+  });
+
+  // illegal move
+  if (move === null) return 'snapback';
+  turn = 1;
+  //var game2=new Chess('2n1r3/p1k2pp1/B1p3b1/P7/5bP1/2N1B3/1P2KP2/2R5 w - - 4 25');
+
+  //console.log(game2.moves());
+  updateStatus();
+  
+};
+
+// update the board position after the piece snap 
+// for castling, en passant, pawn promotion
+var onSnapEnd = function() {
+  board.position(game.fen());
+};
+
+function check_numeric(c)
+{
+  if (c >= '0' && c <= '9') {
+    return true;
+} else {
+    return false;
+}
+}
+
+function fen_to_array(fen)
+{
+  var A = new Array(8);
+  for (var i=0;i<8;i++)
+  {
+    A[i] = new Array();
+  }
+  var k = fen.split(' ');
+  k=k[0].split('/');
+  for(var i=0;i<8;i++)
+  {
+    for(var j=0;j<k[i].length;j++)
+    {
+      if(check_numeric(k[i][j]))
+      {
+        for(var z=0;z<k[i][j];z++)
+          {A[i].push('.');}
+      }
+      else A[i].push(k[i][j]);
+    }
+  }
+  return A.reverse();
+}
+
+function print_2d_array(A)
+{
+  for(var i=0;i<8;i++)
+  {
+    console.log(A[i]);
+  }
+}
+
+function print_moves(moves)
+{
+  for(var x=0;x<moves.length;x++)
+  {
+    console.log(moves[x].from, "-", moves[x].to);
+  }
+}
+
+function get_valid_moves(game1,turn)
+{
+  var moves=[];
+  var A=fen_to_array(game1.fen());
+  for(var i=0;i<8;i++)
+  {
+    for(var j=0;j<8;j++)
+    {
+      if(turn=='b')
+      {
+      
+        if(A[i][j]!='.' && A[i][j]!= A[i][j].toUpperCase() )
+        {
+          var pos1=String.fromCharCode('a'.charCodeAt() + j)+String(i+1);
+          var k=game1.moves({square: pos1});
+          for (var x=0;x<k.length;x++)
+          {
+            if(k[x].slice(-1)=='+')
+              k[x] = k[x].slice(0, -1);
+            k[x] = k[x].slice(-2)
+            if(k[x]=="-0")
+              continue;
+            moves.push({from:pos1,to:k[x]});
+          }
+        }
+      }
+      else if (turn=='w')
+      {
+        
+        if(A[i][j]!='.' && A[i][j]!= A[i][j].toLowerCase() )
+        {
+          
+          var pos1=String.fromCharCode('a'.charCodeAt() + j)+String(i+1);
+          
+          var k=game1.moves({square: pos1});
+          //console.log(k);
+          for (var x=0;x<k.length;x++)
+          {
+            if(k[x].slice(-1)=='+')
+              k[x] = k[x].slice(0, -1);
+            k[x] = k[x].slice(-2)
+            if(k[x]=="-0")
+              continue;
+            moves.push({from:pos1,to:k[x]});
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+function max_val(game1, a, b, depth){
+  var best={};
+  best['v']=-10000;
+  if (cut_off_test(depth)){
+    best['v']= heuristic_value(game1);
+    return best;
+  }
+  //odd depth represent black
+  
+  //var v=-10000;
+  var actions=get_valid_moves(game1,'b');
+  //console.log(actions,game1,a,b,depth);
+  for (var a1 in actions)
+  {
+    var game_temp=new Chess(game1.fen());
+    var move = game_temp.move({
+    from: actions[a1].from,
+    to: actions[a1].to,
+    promotion: 'q' 
+    });
+    var k=min_val(game_temp, a, b, depth+1).v;
+    if(best['v']<k)
+    {
+      best['v']=k;
+      best['action']=actions[a1];
+    }
+
+    //v=Math.max(v, min_val(game_temp, a, b, depth+1));
+    if (best['v']>=b)
+      return best;
+    a=Math.max(a, best['v']);
+  }
+  //console.log(best);
+  return best;
+}
+
+function min_val(game1, a, b, depth){
+  var best={};
+  best['v']=10000;
+  if (cut_off_test(depth)){
+    best['v']= heuristic_value(game1);
+    return best;
+  }
+ 
+  var actions=get_valid_moves(game1,'w');
+
+  //actions=game.moves;
+  for (var a1 in actions){
+    var game_temp2=new Chess(game1.fen());
+    var move = game_temp2.move({
+    from: actions[a1].from,
+    to: actions[a1].to,
+    promotion: 'q' 
+  });//make a in game_temp
+    var k=max_val(game_temp2, a, b, depth+1).v;
+    if(best['v']>k)
+    {
+      best['v']=k;
+      best['action']=actions[a1];
+    }
+
+   // v=Math.min(v, max_val(game_temp2, a, b, depth+1));
+    if (best['v']<=a)
+      return best;
+    b=Math.min(b,best['v']);
+  }
+  return best;
+}
+
+function cut_off_test(depth){
+  if (depth<4)
+    return false;
+  else 
+    return true;
+}
+
+function heuristic_value(game1){
+  //console.log('In Heuristic');
+  var ran=Math.random()*100;
+  return ran;
+}
+
+function get_move(game1)
+{
+  console.log("in get move");
+  
+  var A=fen_to_array(game1.fen());
+  print_2d_array(A);
+  var best=max_val(game1, -10000, +10000, 1);
+  console.log(best);
+  return best['action'];
+//return action from ACTIONS(state) with value v
+  //console.log(v);
+  //var moves=get_valid_moves(game1,'b');
+  //print_moves(moves);
+  //return moves;
+}
+
+
+
+function alpha_beta()
+{
+  console.log('in alpha_beta');
+  turn = 0;
+
+
+  var answer = get_move(game);
+   var move = game.move({
+    from: answer.from,
+    to: answer.to,
+    promotion: 'q' // NOTE: always promote to a queen for example simplicity
+  });
+
+  // var source=document.getElementById('source').value;
+  // var target=document.getElementById('target').value;
+  // var move = game.move({
+  //   from: source,
+  //   to: target,
+  //   promotion: 'q' // NOTE: always promote to a queen for example simplicity
+  // });
+  // console.log("yoyo",move);
+  // if (move === null) return 'snapback';
+  // board.move(source+'-'+target);
+
+
+
+  // // illegal move
+  // if (move === null) return 'snapback';
+  // console.log(board.fen());
+  // console.log(game.fen());
+}
+
+var updateStatus = function() {
+  var status = '';
+
+  var moveColor = 'White';
+  if (game.turn() === 'b') {
+    moveColor = 'Black';
+  }
+
+  // checkmate?
+  if (game.in_checkmate() === true) {
+    status = 'Game over, ' + moveColor + ' is in checkmate.';
+    alert(status);
+  }
+
+  // draw?
+  else if (game.in_draw() === true) {
+    status = 'Game over, drawn position';
+  }
+
+  // game still on
+  else {
+    status = moveColor + ' to move';
+
+    // check?
+    if (game.in_check() === true) {
+      status += ', ' + moveColor + ' is in check';
+    }
+  }
+  if (turn == 1)
+  {
+    alpha_beta();
+  }
+};
+
+var cfg = {
+  draggable: true,
+  position: 'start',
+  onDragStart: onDragStart,
+  onDrop: onDrop,
+  onSnapEnd: onSnapEnd
+};
+board = ChessBoard('board', cfg);
+
+updateStatus();
+</script> 
+<center><h2><font color="yellow">Made by Abhinav & Dhruv</font></h2></center>
+
+</body>
+</html>

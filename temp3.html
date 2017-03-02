@@ -1,0 +1,249 @@
+<html>
+<head>
+	<title>Test</title>
+	<link rel="stylesheet" type="text/css" href="css/chessboard-0.3.0.css" media="screen" />
+	<link rel="stylesheet" type="text/css" href="css/chessboard-0.3.0.min.css" media="screen" />
+</head>
+<body>
+<script src="js/chessboard-0.3.0.js" type="text/javascript"></script>
+<script src="js/chessboard-0.3.0.min" type="text/javascript"></script>
+ <script src="https://code.jquery.com/jquery-1.10.1.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.js"></script>
+<div id="board" style="width: 400px"></div>
+<script>
+
+var board,turn=0,
+  game = new Chess(),
+  statusEl = $('#status'),
+  fenEl = $('#fen'),
+  pgnEl = $('#pgn');
+
+// do not pick up pieces if the game is over
+// only pick up pieces for the side to move
+var onDragStart = function(source, piece, position, orientation) {
+  if (game.game_over() === true || 
+       turn == 1||
+      (game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+      (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+    return false;
+  }
+};
+
+var onDrop = function(source, target) {
+  // see if the move is legal
+  var move = game.move({
+    from: source,
+    to: target,
+    promotion: 'q' // NOTE: always promote to a queen for example simplicity
+  });
+
+  // illegal move
+  if (move === null) return 'snapback';
+  turn = 1;
+  updateStatus();
+  
+};
+
+// update the board position after the piece snap 
+// for castling, en passant, pawn promotion
+var onSnapEnd = function() {
+  board.position(game.fen());
+};
+
+function check_numeric(c)
+{
+  if (c >= '0' && c <= '9') {
+    return true;
+} else {
+    return false;
+}
+}
+
+function fen_to_array(fen)
+{
+  var A = new Array(8);
+  for (var i=0;i<8;i++)
+  {
+    A[i] = new Array();
+  }
+  var k = fen.split(' ');
+  k=k[0].split('/');
+  for(var i=0;i<8;i++)
+  {
+    for(var j=0;j<k[i].length;j++)
+    {
+      if(check_numeric(k[i][j]))
+      {
+        for(var z=0;z<k[i][j];z++)
+          {A[i].push('.');}
+      }
+      else A[i].push(k[i][j]);
+    }
+  }
+  return A;
+}
+
+function print_2d_array(A)
+{
+  for(var i=0;i<8;i++)
+  {
+    console.log(A[i]);
+  }
+}
+
+function print_moves(moves)
+{
+  for(var x=0;x<moves.length;x++)
+  {
+    console.log(moves[x].from, "-", moves[x].to);
+  }
+}
+
+function get_valid_moves(game1,turn)
+{
+  var moves=[];
+  var A=fen_to_array(game1.fen());
+  for(var i=0;i<8;i++)
+  {
+    for(var j=0;j<8;j++)
+    {
+      var f_string=(game1.fen()).split(' ');
+      if(turn=='b')
+      {
+        f_string[1]='b';
+        fen_string="";
+        for(var x=0;x<f_string.length;x++)
+        {
+          fen_string=fen_string+String(f_string[x]+' ');
+        }
+        fen_string.slice(0, -1);
+        console.log(fen_string);
+        var game2=new Chess(fen_string);
+        if(A[i][j]!='.' && A[i][j]!= A[i][j].toUpperCase() )
+        {
+          var pos1=String.fromCharCode('a'.charCodeAt() + j)+String(i+1);
+          k=game2.moves({square: pos1});
+          for (var x=0;x<k.length;x++)
+          {
+            if(k[x][0]==k[x][0].toUpperCase())
+              {
+              k[x]=k[x].substring(1);}
+            moves.push({from:pos1,to:k[x]});
+          }
+        }
+      }
+      else if (turn=='w')
+      {
+        if(A[i][j]!='.' && A[i][j]!= A[i][j].toLowerCase() )
+        {
+          var pos1=String.fromCharCode('a'.charCodeAt() + j)+String(i+1);
+          k=game1.moves({square: pos1});
+          for (var x=0;x<k.length;x++)
+          {
+            if(k[x][0]==k[x][0].toUpperCase())
+              {k[x]=k[x].substring(1);}
+            moves.push({from:pos1,to:k[x]});
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+
+
+function get_move(game1)
+{
+  console.log("in get move");
+  
+  var A=fen_to_array(game1.fen());
+  A=A.reverse();
+  print_2d_array(A);
+  var moves=get_valid_moves(game1,'b');
+  print_moves(moves);
+  return moves;
+}
+
+
+
+function alpha_beta()
+{
+  console.log('in alpha_beta');
+  turn = 0;
+
+
+  var answer = get_move(game);
+
+  // var source=document.getElementById('source').value;
+  // var target=document.getElementById('target').value;
+  // var move = game.move({
+  //   from: source,
+  //   to: target,
+  //   promotion: 'q' // NOTE: always promote to a queen for example simplicity
+  // });
+  // console.log("yoyo",move);
+  // if (move === null) return 'snapback';
+  // board.move(source+'-'+target);
+
+
+
+  // // illegal move
+  // if (move === null) return 'snapback';
+  console.log(board.fen());
+  console.log(game.fen());
+}
+
+var updateStatus = function() {
+  var status = '';
+
+  var moveColor = 'White';
+  if (game.turn() === 'b') {
+    moveColor = 'Black';
+  }
+
+  // checkmate?
+  if (game.in_checkmate() === true) {
+    status = 'Game over, ' + moveColor + ' is in checkmate.';
+    alert(status);
+  }
+
+  // draw?
+  else if (game.in_draw() === true) {
+    status = 'Game over, drawn position';
+  }
+
+  // game still on
+  else {
+    status = moveColor + ' to move';
+
+    // check?
+    if (game.in_check() === true) {
+      status += ', ' + moveColor + ' is in check';
+    }
+  }
+  if (turn == 1)
+  {
+    alpha_beta();
+  }
+};
+
+var cfg = {
+  draggable: true,
+  position: 'start',
+  onDragStart: onDragStart,
+  onDrop: onDrop,
+  onSnapEnd: onSnapEnd
+};
+board = ChessBoard('board', cfg);
+
+updateStatus();
+</script> 
+<p>Status: <span id="status"></span></p>
+<p>FEN: <span id="fen"></span></p>
+<p>PGN: <span id="pgn"></span></p>
+<input type="text" id = "source" value="a7">
+<input type="text" id = "target" value = "a5">
+
+</body>
+</html>
