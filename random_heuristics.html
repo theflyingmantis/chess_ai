@@ -15,8 +15,8 @@
 var board,turn=0,
   game = new Chess(),
   statusEl = $('#status'),
-  fenEl = $('#fen'),
-  pgnEl = $('#pgn');
+  fenEl = $('#fen');
+
 
 // do not pick up pieces if the game is over
 // only pick up pieces for the side to move
@@ -112,14 +112,13 @@ function get_valid_moves(game1,turn)
     {
       if(turn=='b')
       {
-      
         if(A[i][j]!='.' && A[i][j]!= A[i][j].toUpperCase() )
         {
           var pos1=String.fromCharCode('a'.charCodeAt() + j)+String(i+1);
           var k=game1.moves({square: pos1});
           for (var x=0;x<k.length;x++)
           {
-            if(k[x].slice(-1)=='+')
+            if(!check_numeric(k[x].slice(-1)))
               k[x] = k[x].slice(0, -1);
             k[x] = k[x].slice(-2)
             if(k[x]=="-0")
@@ -230,10 +229,84 @@ function cut_off_test(depth){
     return true;
 }
 
+function p2table(game1)
+{
+	var A=fen_to_array(game1.fen());
+	A=A.reverse();
+	var k=0;
+	for(var i=0;i<8;i++)
+	{
+		for(var j=0;j<8;j++)
+		{
+			if(A[i][j]=='p')
+				k=k+heur_pawn[i][j];
+			if(A[i][j]=='b')
+				k=k+heur_bishop[i][j];
+			if(A[i][j]=='r')
+				k=k+heur_rook[i][j];
+			if(A[i][j]=='n')
+				k=k+heur_knight[i][j];
+			if(A[i][j]=='q')
+				k=k+heur_queen[i][j];
+		}
+	}
+	return k;
+}
+
+function material(game1)
+{
+	var A=fen_to_array(game1.fen());
+	var k=0;
+	for(var i=0;i<8;i++)
+	{
+		for(var j=0;j<8;j++)
+		{
+			if(A[i][j]=='q')
+				k=k+9;
+			if(A[i][j]=='k')
+				k=k+200;
+			if(A[i][j]=='b')
+				k=k+3;
+			if(A[i][j]=='r')
+				k=k+5;
+			if(A[i][j]=='p')
+				k=k+1;
+			if(A[i][j]=='n')
+				k=k+3;
+			if(A[i][j]=='Q')
+				k=k-9;
+			if(A[i][j]=='K')
+				k=k-200;
+			if(A[i][j]=='B')
+				k=k-3;
+			if(A[i][j]=='R')
+				k=k-5;
+			if(A[i][j]=='P')
+				k=k-1;
+			if(A[i][j]=='N')
+				k=k-3;
+		}
+	}
+	return k;
+}
+
+function mobility(game1)
+{
+	var fen=game1.fen();
+	return 0;
+}
+
 function heuristic_value(game1){
-  //console.log('In Heuristic');
-  var ran=Math.random()*100;
-  return ran;
+  var A=fen_to_array(game1.fen());
+  var p2,mat,mob;
+  p2=p2table(game1);
+  mat=material(game1);
+  var mob1=mobility(game1);
+  //mob=Math.floor((Math.random()*100));
+  console.log(p2,mat);
+  return p2+60*mat+mob1;
+  //
+  //return ran;
 }
 
 function get_move(game1)
@@ -245,11 +318,6 @@ function get_move(game1)
   var best=max_val(game1, -10000, +10000, 1);
   console.log(best);
   return best['action'];
-//return action from ACTIONS(state) with value v
-  //console.log(v);
-  //var moves=get_valid_moves(game1,'b');
-  //print_moves(moves);
-  //return moves;
 }
 
 
@@ -266,24 +334,6 @@ function alpha_beta()
     to: answer.to,
     promotion: 'q' // NOTE: always promote to a queen for example simplicity
   });
-
-  // var source=document.getElementById('source').value;
-  // var target=document.getElementById('target').value;
-  // var move = game.move({
-  //   from: source,
-  //   to: target,
-  //   promotion: 'q' // NOTE: always promote to a queen for example simplicity
-  // });
-  // console.log("yoyo",move);
-  // if (move === null) return 'snapback';
-  // board.move(source+'-'+target);
-
-
-
-  // // illegal move
-  // if (move === null) return 'snapback';
-  // console.log(board.fen());
-  // console.log(game.fen());
 }
 
 var updateStatus = function() {
@@ -312,13 +362,48 @@ var updateStatus = function() {
     // check?
     if (game.in_check() === true) {
       status += ', ' + moveColor + ' is in check';
+      alert(status);
     }
   }
+
   if (turn == 1)
   {
     alpha_beta();
   }
 };
+
+var heur_pawn=new Array(8);
+var heur_bishop=new Array(8);
+var heur_queen=new Array(8);
+var heur_rook=new Array(8);
+var heur_knight=new Array(8);
+
+function calculate_2d_arrays()
+{
+	for (var i=0;i<8;i++)
+  	{
+    heur_pawn[i] = new Array();
+    heur_bishop[i] = new Array();
+    heur_queen[i] = new Array();
+    heur_rook[i] = new Array();
+    heur_knight[i] = new Array();
+    }
+	for(var i=0;i<64;i++)
+	{
+		var k=Math.floor( i/8 );
+		heur_pawn[k].push(pawn[i]);
+		heur_bishop[k].push(pawn[i]);
+		heur_queen[k].push(pawn[i]);
+		heur_rook[k].push(pawn[i]);
+		heur_knight[k].push(pawn[i]);
+	}
+	heur_pawn.reverse();
+	heur_bishop.reverse();
+	heur_queen.reverse();
+	heur_rook.reverse();
+	heur_knight.reverse();
+	console.log(heur_pawn);
+}
 
 var cfg = {
   draggable: true,
@@ -330,7 +415,62 @@ var cfg = {
 board = ChessBoard('board', cfg);
 
 updateStatus();
-</script> 
+
+  var pawn=[0,  0,  0,  0,  0,  0,  0,  0,
+ 50, 50, 50, 50, 50, 50, 50, 50,
+ 10, 10, 20, 30, 30, 20, 10, 10,
+ 5,  5, 10, 25, 25, 10,  5,  5,
+ 0,  0,  0, 20, 20,  0,  0,  0,
+ 5, -5,-10,  0,  0,-10, -5,  5,
+ 5, 10, 10,-20,-20, 10, 10,  5,
+ 0,  0,  0,  0,  0,  0,  0,  0];
+
+ var knight=[-50,-40,-30,-30,-30,-30,-40,-50,
+-40,-20,  0,  0,  0,  0,-20,-40,
+-30,  0, 10, 15, 15, 10,  0,-30,
+-30,  5, 15, 20, 20, 15,  5,-30,
+-30,  0, 15, 20, 20, 15,  0,-30,
+-30,  5, 10, 15, 15, 10,  5,-30,
+-40,-20,  0,  5,  5,  0,-20,-40,
+-50,-40,-30,-30,-30,-30,-40,-50];
+
+var bishop=[-20,-10,-10,-10,-10,-10,-10,-20,
+-10,  0,  0,  0,  0,  0,  0,-10,
+-10,  0,  5, 10, 10,  5,  0,-10,
+-10,  5,  5, 10, 10,  5,  5,-10,
+-10,  0, 10, 10, 10, 10,  0,-10,
+-10, 10, 10, 10, 10, 10, 10,-10,
+-10,  5,  0,  0,  0,  0,  5,-10,
+-20,-10,-10,-10,-10,-10,-10,-20];
+
+var rook=[0,  0,  0,  0,  0,  0,  0,  0,
+  5, 10, 10, 10, 10, 10, 10,  5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+ -5,  0,  0,  0,  0,  0,  0, -5,
+  0,  0,  0,  5,  5,  0,  0,  0];
+
+var queen=[-20,-10,-10, -5, -5,-10,-10,-20,
+-10,  0,  0,  0,  0,  0,  0,-10,
+-10,  0,  5,  5,  5,  5,  0,-10,
+ -5,  0,  5,  5,  5,  5,  0, -5,
+  0,  0,  5,  5,  5,  5,  0, -5,
+-10,  5,  5,  5,  5,  5,  0,-10,
+-10,  0,  5,  0,  0,  0,  0,-10,
+-20,-10,-10, -5, -5,-10,-10,-20];
+
+calculate_2d_arrays();
+
+
+
+
+
+
+
+
+</script>
 <center><h2><font color="yellow">Made by Abhinav & Dhruv</font></h2></center>
 
 </body>
